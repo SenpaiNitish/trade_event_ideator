@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock News Analyzer Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Stock News Analyzer</h1>
+            <p class="text-gray-600">AI-powered analysis of stock news for trading signals</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-center">
+                <button 
+                    onclick="fetchSignals()" 
+                    id="refreshBtn"
+                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <span>🔄</span> Refresh Signals
+                </button>
+                <div id="lastUpdated" class="text-sm text-gray-500"></div>
+            </div>
+        </div>
+
+        <!-- Error display -->
+        <div id="errorDisplay" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div class="flex items-center gap-2">
+                <span>⚠️</span>
+                <p id="errorMessage" class="text-red-800"></p>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <h3 class="text-sm font-medium text-gray-500">Total Signals</h3>
+                <p id="totalSignals" class="text-2xl font-bold text-gray-900">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <h3 class="text-sm font-medium text-gray-500">Buy Signals</h3>
+                <p id="buySignals" class="text-2xl font-bold text-green-600">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <h3 class="text-sm font-medium text-gray-500">Sell Signals</h3>
+                <p id="sellSignals" class="text-2xl font-bold text-red-600">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <h3 class="text-sm font-medium text-gray-500">Hold Signals</h3>
+                <p id="holdSignals" class="text-2xl font-bold text-gray-600">0</p>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span class="ml-2 text-gray-600">Loading signals...</span>
+        </div>
+
+        <!-- Signals Grid -->
+        <div id="signalsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </div>
+    </div>
+
+    <script>
+        let signals = [];
+
+        function getSignalIcon(signal) {
+            switch(signal) {
+                case 'buy': return '🟢';
+                case 'sell': return '🔴';
+                case 'hold': return '⚪';
+                default: return '⚫';
+            }
+        }
+
+        function getSignalColor(signal) {
+            switch(signal) {
+                case 'buy': return 'text-green-600 bg-green-50 border-green-200';
+                case 'sell': return 'text-red-600 bg-red-50 border-red-200';
+                case 'hold': return 'text-gray-600 bg-gray-50 border-gray-200';
+                default: return 'text-gray-600 bg-gray-50 border-gray-200';
+            }
+        }
+
+        function getConfidenceColor(confidence) {
+            if (confidence >= 80) return 'bg-green-500';
+            if (confidence >= 60) return 'bg-yellow-500';
+            return 'bg-red-500';
+        }
+
+        function updateStats() {
+            const total = signals.length;
+            const buy = signals.filter(s => s.signal === 'buy').length;
+            const sell = signals.filter(s => s.signal === 'sell').length;
+            const hold = signals.filter(s => s.signal === 'hold').length;
+
+            document.getElementById('totalSignals').textContent = total;
+            document.getElementById('buySignals').textContent = buy;
+            document.getElementById('sellSignals').textContent = sell;
+            document.getElementById('holdSignals').textContent = hold;
+        }
+
+        function renderSignals() {
+            const grid = document.getElementById('signalsGrid');
+            grid.innerHTML = '';
+
+            signals.forEach((signal, index) => {
+                const card = document.createElement('div');
+                card.className = `bg-white rounded-lg shadow-md border-2 p-6 ${getSignalColor(signal.signal)}`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">${signal.stock}</h3>
+                            <p class="text-sm text-gray-600">${signal.event}</p>
+                        </div>
+                        <div class="text-2xl">
+                            ${getSignalIcon(signal.signal)}
+                            ${signal.confidence >= 80 ? '<span class="ml-1">🔥</span>' : ''}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Confidence</span>
+                            <span class="text-sm font-bold">${signal.confidence}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="h-2 rounded-full ${getConfidenceColor(signal.confidence)}" 
+                                 style="width: ${signal.confidence}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-700">
+                            <strong>Reason:</strong> ${signal.reason}
+                        </p>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-xs text-gray-500 italic">"${signal.headline}"</p>
+                    </div>
+
+                    <div class="flex justify-between items-center text-xs text-gray-500">
+                        <span class="capitalize">${signal.sentiment} sentiment</span>
+                        <span>${new Date(signal.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        async function fetchSignals() {
+            const loading = document.getElementById('loading');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const errorDisplay = document.getElementById('errorDisplay');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            loading.classList.remove('hidden');
+            refreshBtn.disabled = true;
+            errorDisplay.classList.add('hidden');
+
+            try {
+                const response = await axios.get('http://localhost:8000/signals');
+                signals = response.data.signals;
+                
+                updateStats();
+                renderSignals();
+                
+                document.getElementById('lastUpdated').textContent = 
+                    `Last updated: ${new Date(response.data.timestamp).toLocaleTimeString()}`;
+                    
+            } catch (error) {
+                console.error('Error fetching signals:', error);
+                errorMessage.textContent = 'Failed to fetch signals. Make sure the backend is running on localhost:8000';
+                errorDisplay.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Auto-refresh every 5 minutes
+        setInterval(fetchSignals, 5 * 60 * 1000);
+        
+        // Initial load
+        fetchSignals();
+    </script>
+</body>
+</html>
