@@ -11,8 +11,8 @@ Whether you’re a trader looking for AI-generated trade calls or a developer ex
 ### Option 1: Docker (Recommended)
 ```bash
 # run this in your powershell
-git clone https://github.com/SenpaiNitish/trade_ideator2.git 
-cd trade_ideator2
+git clone https://github.com/SenpaiNitish/trade_event_ideator.git 
+cd trade_event_ideator
 docker-compose up --build
 ```
 Access: http://localhost:8080/demo.html
